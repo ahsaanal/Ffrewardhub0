@@ -1,108 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>Rewards Hub</title>
-    <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reward Hub</title>
+  
+  <!-- CSS فائل کو یہاں لنک کیا گیا ہے -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Firebase کی ضروری فائلیں -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 </head>
 <body>
-    <div id="main-loader" class="loader"></div>
-    <div id="login-section" style="display:none;">
-        <div class="card">
-            <div id="signup-form">
-                <h2>Create Account</h2>
-                <input id="gamer_name" placeholder="Gamer Name" type="text"/>
-                <input id="email" placeholder="Email" type="email"/>
-                <input id="password" placeholder="Password" type="password"/>
-                <button id="signup-btn">Sign Up</button>
-            </div>
-            <div id="signin-form" style="display:none">
-                 <h2>Sign In</h2>
-                <input id="signin_email" placeholder="Email" type="email"/>
-                <input id="signin_password" placeholder="Password" type="password"/>
-                <button id="signin-btn">Sign In</button>
-            </div>
-            <p class="info"><a href="#" id="auth-switch-link">Already have an account? Sign In</a></p>
-        </div>
+
+  <div class="container" id="authSection">
+    <div id="loginDiv">
+      <h2>Login</h2>
+      <input type="email" id="loginEmail" placeholder="Email">
+      <input type="password" id="loginPassword" placeholder="Password">
+      <button onclick="loginUser()">Login</button>
+      <p style="text-align:center">Don't have an account? <a href="#" onclick="showSignup()">Sign Up</a></p>
     </div>
-    
-    <main id="app-container" style="display:none;">
-        <!-- HOME SECTION -->
-        <section id="home-section" class="page-section active">
-            <div class="card">
-                <h2><i class="fas fa-wallet"></i> My Wallet</h2>
-                <div class="wallet-display">
-                    <p>Current Balance</p>
-                    <div class="amount" id="wallet">💎 0</div>
-                </div>
-            </div>
-            <div class="card">
-                <h2><i class="fas fa-paper-plane"></i> Withdraw Diamonds</h2>
-                <p class="info">You need at least 70💎 to request a withdrawal.</p>
-                <div class="progress-bar-container">
-                    <div id="withdrawal-progress" class="progress-bar-fill"></div>
-                </div>
-                <p id="progress-text" class="progress-text">0 / 70 Diamonds</p>
-                <input id="ff_uid" placeholder="Enter your Free Fire UID" type="text"/>
-                <button id="withdraw-btn">Request Withdrawal</button>
-            </div>
-        </section>
+    <div id="signupDiv" class="hidden">
+      <h2>Sign Up</h2>
+      <input type="text" id="signupName" placeholder="Gamer Name">
+      <select id="signupGame">
+        <option value="Free Fire">Free Fire</option>
+        <option value="PUBG">PUBG</option>
+      </select>
+      <input type="email" id="signupEmail" placeholder="Email">
+      <input type="password" id="signupPassword" placeholder="Password">
+      <button onclick="signupUser()">Create Account</button>
+      <p style="text-align:center">Already have an account? <a href="#" onclick="showLogin()">Login</a></p>
+    </div>
+  </div>
 
-        <!-- DAILY REWARDS SECTION -->
-        <section id="daily-section" class="page-section">
-            <div class="card">
-                <h2><i class="fas fa-calendar-check"></i> Daily Streak Bonus</h2>
-                <p class="info" id="streak-info">Claim your daily reward! The more you come back, the bigger the reward.</p>
-                <button id="daily-reward-btn">Claim Daily Bonus</button>
-            </div>
-            <div class="card">
-                <h2><i class="fas fa-star"></i> Bonus Rewards</h2>
-                <p class="info">Watch ads to earn extra diamonds.</p>
-                <a href="https://www.profitableratecpm.com/zkfbdxz0g?key=a531577adb85179147f867f110887f03" target="_blank" style="text-decoration: none;">
-                    <button id="watch-ad-btn">Watch Ad & Earn 2💎</button>
-                </a>
-                <p class="info" id="ads-left"></p>
-            </div>
-        </section>
+  <div class="container hidden" id="dashboard">
+    <h2>Welcome to Reward Hub</h2>
+    <h3 id="totalBalance">Total Balance: 0 Diamonds</h3>
+    <button onclick="claimDailyCheckIn()">📆 Daily Check-In (3 Diamonds)</button>
+    <br>
+    <button onclick="watchAd()">📺 Watch Ad (1 Diamond)</button>
+    <p id="adsWatched">Ads Watched: 0/10</p>
+    <br>
+    <p>🔗 Your Referral Link:</p>
+    <input type="text" id="refLink" readonly>
+    <button onclick="copyReferral()">Copy Link</button>
+    <br><br>
+    <h3>💰 Withdraw</h3>
+    <input type="text" id="withdrawUID" placeholder="Your Game UID">
+    <button onclick="withdraw()">Withdraw (70 Diamonds Minimum)</button>
+  </div>
 
-        <!-- SPIN WHEEL SECTION -->
-        <section id="spin-section" class="page-section">
-            <div class="card">
-                <h2><i class="fas fa-dharmachakra"></i> Spin the Wheel</h2>
-                <p class="info">Try your luck! You can spin once every day for free.</p>
-                <div class="wheel-container">
-                    <div id="spin-wheel" class="wheel"></div>
-                    <div class="spin-pointer"></div>
-                </div>
-                <button id="spin-btn">SPIN!</button>
-            </div>
-        </section>
-        
-        <!-- PROFILE & REFERRAL SECTION -->
-        <section id="profile-section" class="page-section">
-             <div class="card">
-                <h2><i class="fas fa-users"></i> Refer & Earn</h2>
-                <p class="info">Share your link and earn 7 diamonds for each friend who signs up!</p>
-                <input id="referral-link" readonly="readonly" type="text" value="Loading..."/>
-                <button id="copy-ref-btn">Copy Link</button>
-            </div>
-            <div class="card">
-                <h2><i class="fas fa-user-circle"></i> Account</h2>
-                <button id="logout-btn" style="background-color: #FF5630;">Logout</button>
-            </div>
-        </section>
-    </main>
+  <!-- JavaScript فائل کو یہاں آخر میں لنک کیا گیا ہے -->
+  <script src="script.js"></script>
 
-    <nav class="bottom-nav" id="app-nav" style="display:none;">
-        <button class="nav-btn active"><i class="fas fa-home"></i> Home</button>
-        <button class="nav-btn"><i class="fas fa-gift"></i> Daily</button>
-        <button class="nav-btn"><i class="fas fa-dharmachakra"></i> Spin</button>
-        <button class="nav-btn"><i class="fas fa-user"></i> Profile</button>
-    </nav>
-
-    <div id="toast-notification"></div>
-    <script type="module" src="script.js"></script>
 </body>
 </html>

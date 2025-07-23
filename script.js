@@ -1,150 +1,130 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-import { getFirestore, doc, setDoc, onSnapshot, updateDoc, increment, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
-
 const firebaseConfig = {
-    apiKey: "AIzaSyDBcPggJxq4yrPLoZwVwFNoA341b2BISkQ",
-    authDomain: "reward-hub-4d851.firebaseapp.com",
-    projectId: "reward-hub-4d851",
-    storageBucket: "reward-hub-4d851.firebasestorage.app",
-    messagingSenderId: "961561066999",
-    appId: "1:961561066999:web:a5964e9a9ea04e46bbc2f2",
-    measurementId: "G-BL5887T9J3"
+  apiKey: "AIzaSyCfABAhrpZs4_DRUDcFD2-12S6UBcTH8TQ",
+  authDomain: "ffrewardhub.firebaseapp.com",
+  projectId: "ffrewardhub",
+  storageBucket: "ffrewardhub.firebasestorage.app",
+  messagingSenderId: "785720442176",
+  appId: "1:785720442176:web:667a54d10a7a1185b74ea5",
+  measurementId: "G-W469VH5ZXQ"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+const loginDiv = document.getElementById("loginDiv");
+const signupDiv = document.getElementById("signupDiv");
+const authSection = document.getElementById("authSection");
+const dashboard = document.getElementById("dashboard");
+const totalBalance = document.getElementById("totalBalance");
+const adsWatched = document.getElementById("adsWatched");
+const refLink = document.getElementById("refLink");
+
 let currentUser = null;
-let userData = {};
 
-// --- Helper Functions ---
-function showToast(message) {
-    const toast = document.getElementById('toast-notification');
-    toast.textContent = message;
-    toast.classList.add('show');
-    setTimeout(() => { toast.classList.remove('show'); }, 2000);
+function showSignup() {
+  loginDiv.classList.add("hidden");
+  signupDiv.classList.remove("hidden");
+}
+function showLogin() {
+  signupDiv.classList.add("hidden");
+  loginDiv.classList.remove("hidden");
 }
 
-// --- Event Listeners ---
-function setupEventListeners() {
-    const navButtons = document.querySelectorAll('.nav-btn');
-    const sections = ['home-section', 'daily-section', 'spin-section', 'profile-section'];
-    navButtons.forEach((btn, index) => {
-        btn.addEventListener('click', () => showSection(sections[index], btn));
-    });
+function signupUser() {
+  const email = document.getElementById("signupEmail").value;
+  const pass = document.getElementById("signupPassword").value;
+  const name = document.getElementById("signupName").value;
+  const game = document.getElementById("signupGame").value;
 
-    document.getElementById('daily-reward-btn').addEventListener('click', claimDailyReward);
-    document.getElementById('watch-ad-btn').addEventListener('click', watchAd);
-    document.getElementById('withdraw-btn').addEventListener('click', sendWithdrawal);
-    document.getElementById('spin-btn').addEventListener('click', handleSpin);
-    document.getElementById('copy-ref-btn').addEventListener('click', copyReferralLink);
-    document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
-    
-    document.getElementById('signup-btn').addEventListener('click', handleSignUp);
-    document.getElementById('signin-btn').addEventListener('click', handleSignIn);
-    document.getElementById('auth-switch-link').addEventListener('click', toggleAuthForms);
+  auth.createUserWithEmailAndPassword(email, pass)
+    .then((cred) => {
+      db.ref("users/" + cred.user.uid).set({
+        name: name,
+        game: game,
+        email: email,
+        diamonds: 0,
+        adsWatched: 0,
+        lastCheckIn: ""
+      });
+      showDashboard(cred.user);
+    })
+    .catch(e => alert(e.message));
 }
 
-// --- Main Functions ---
-function showSection(sectionId, element) { /* Same as before */ }
+function loginUser() {
+  const email = document.getElementById("loginEmail").value;
+  const pass = document.getElementById("loginPassword").value;
 
-function updateUI(data) {
-    const diamonds = data.diamonds || 0;
-    const adsWatched = data.adsWatched || 0;
-    const today = new Date().toLocaleDateString();
-
-    // Home Section
-    document.getElementById('wallet').innerText = `💎 ${diamonds}`;
-    const progress = Math.min((diamonds / 70) * 100, 100);
-    document.getElementById('withdrawal-progress').style.width = `${progress}%`;
-    document.getElementById('progress-text').innerText = `${diamonds} / 70 Diamonds`;
-    document.getElementById('withdraw-btn').disabled = diamonds < 70;
-
-    // Daily Section
-    const dailyClaimed = data.lastDailyClaim === today;
-    document.getElementById('daily-reward-btn').disabled = dailyClaimed;
-    document.getElementById('daily-reward-btn').innerText = dailyClaimed ? "Claimed Today" : `Claim ${getStreakBonus(data.streak || 0)}💎 Bonus`;
-    document.getElementById('streak-info').innerText = `You are on a ${data.streak || 0} day streak! Keep it up.`;
-    
-    // Ads
-    document.getElementById('ads-left').innerText = `You have watched ${adsWatched} of 5 ads today.`;
-    document.getElementById('watch-ad-btn').parentElement.style.pointerEvents = (adsWatched >= 5) ? 'none' : 'auto';
-    document.getElementById('watch-ad-btn').disabled = adsWatched >= 5;
-
-    // Spin Wheel
-    const spinClaimed = data.lastSpin === today;
-    document.getElementById('spin-btn').disabled = spinClaimed;
-    document.getElementById('spin-btn').innerText = spinClaimed ? "Already Spun Today" : "SPIN!";
+  auth.signInWithEmailAndPassword(email, pass)
+    .then((cred) => {
+      showDashboard(cred.user);
+    })
+    .catch(e => alert(e.message));
 }
 
-function getStreakBonus(streak) {
-    if (streak >= 7) return 15;
-    if (streak >= 3) return 5;
-    return 3;
-}
-
-async function claimDailyReward() {
-    const today = new Date().toLocaleDateString();
-    if (userData.lastDailyClaim === today) return showToast("You have already claimed this today.");
-
-    const userRef = doc(db, "users", currentUser.uid);
-    let streak = userData.streak || 0;
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if(userData.lastDailyClaim === yesterday.toLocaleDateString()){
-        streak++;
-    } else {
-        streak = 1; // Reset streak
+function showDashboard(user) {
+  currentUser = user;
+  authSection.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+  refLink.value = window.location.origin + "?ref=" + user.uid;
+  db.ref("users/" + user.uid).on("value", snap => {
+    const data = snap.val();
+    if (data) {
+      totalBalance.innerText = "Total Balance: " + data.diamonds + " Diamonds";
+      adsWatched.innerText = "Ads Watched: " + data.adsWatched + "/10";
     }
-
-    const bonus = getStreakBonus(streak);
-    await updateDoc(userRef, { 
-        diamonds: increment(bonus), 
-        lastDailyClaim: today,
-        streak: streak
-    });
-    showToast(`Streak Bonus! You earned ${bonus} diamonds! 💎`);
+  });
 }
 
-async function watchAd() { /* Same as before */ }
-async function sendWithdrawal() { /* Same as before */ }
-function copyReferralLink() { /* Same as before */ }
-
-// Spin Wheel Logic
-const prizes = [50, 1, 10, 2, 20, 5, 15, 1]; // 8 sections
-async function handleSpin() {
-    const today = new Date().toLocaleDateString();
-    if (userData.lastSpin === today) return showToast("You can only spin once a day.");
-    
-    document.getElementById('spin-btn').disabled = true;
-    
-    const wheel = document.getElementById('spin-wheel');
-    const randomSpins = Math.floor(Math.random() * 5) + 5; // 5 to 9 full spins
-    const prizeIndex = Math.floor(Math.random() * prizes.length);
-    const stopAngle = (randomSpins * 360) + (prizeIndex * 45) + 22.5; // Center of the slice
-    
-    wheel.style.transform = `rotate(${stopAngle}deg)`;
-
-    setTimeout(async () => {
-        const prize = prizes[prizeIndex];
-        showToast(`Congratulations! You won ${prize} diamonds!`);
-        const userRef = doc(db, "users", currentUser.uid);
-        await updateDoc(userRef, {
-            diamonds: increment(prize),
-            lastSpin: today
-        });
-        document.getElementById('spin-btn').disabled = false;
-    }, 4500); // Wait for animation to finish
+function claimDailyCheckIn() {
+  const today = new Date().toISOString().split('T')[0];
+  db.ref("users/" + currentUser.uid).once("value", snap => {
+    const data = snap.val();
+    if (data.lastCheckIn !== today) {
+      const newDiamonds = data.diamonds + 3;
+      db.ref("users/" + currentUser.uid).update({
+        diamonds: newDiamonds,
+        lastCheckIn: today
+      });
+      alert("3 Diamonds Claimed!");
+    } else {
+      alert("Already claimed today!");
+    }
+  });
 }
 
-// --- Authentication & Initialization ---
-async function handleSignUp() { /* Same as before, but add streak: 0, lastDailyClaim: null, lastSpin: null */ }
-async function handleSignIn() { /* Same as before */ }
-function toggleAuthForms(e) { /* Same as before */ }
+function watchAd() {
+  db.ref("users/" + currentUser.uid).once("value", snap => {
+    const data = snap.val();
+    if (data.adsWatched < 10) {
+      window.open('https://www.profitableratecpm.com/v8p9te1b9c?key=521e9c2f1809cf28556f8c14261f81a7', '_blank');
+      const newAds = data.adsWatched + 1;
+      const newDiamonds = data.diamonds + 1;
+      db.ref("users/" + currentUser.uid).update({
+        adsWatched: newAds,
+        diamonds: newDiamonds
+      });
+      alert("1 Diamond earned!");
+    } else {
+      alert("Max 10 ads per day!");
+    }
+  });
+}
 
-onAuthStateChanged(auth, (user) => { /* Same as before */ });
-function initializeDashboard() { /* Same as before */ }
+function copyReferral() {
+  navigator.clipboard.writeText(refLink.value);
+  alert("Referral link copied!");
+}
 
-setupEventListeners();
+function withdraw() {
+  const uid = document.getElementById("withdrawUID").value;
+  db.ref("users/" + currentUser.uid).once("value", snap => {
+    const data = snap.val();
+    if (data.diamonds >= 70) {
+      alert("Withdraw requested for UID: " + uid);
+    } else {
+      alert("You need at least 70 Diamonds to withdraw.");
+    }
+  });
+}```
